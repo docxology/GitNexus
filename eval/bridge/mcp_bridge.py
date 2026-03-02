@@ -14,7 +14,6 @@ import subprocess
 import sys
 import threading
 import time
-from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("mcp_bridge")
@@ -23,7 +22,7 @@ logger = logging.getLogger("mcp_bridge")
 class MCPBridge:
     """
     Manages a GitNexus MCP server subprocess and proxies tool calls to it.
-    
+
     Usage:
         bridge = MCPBridge(repo_path="/path/to/repo")
         bridge.start()
@@ -100,7 +99,7 @@ class MCPBridge:
     def call_tool(self, tool_name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """
         Call a GitNexus MCP tool and return the result.
-        
+
         Returns the tool result content or None on error.
         """
         if not self._started:
@@ -280,7 +279,7 @@ class MCPToolCLI:
     """
     CLI wrapper that exposes MCP tools as simple command-line calls.
     Used by the bash wrapper scripts inside Docker containers.
-    
+
     Usage from bash:
         python -m bridge.mcp_bridge query '{"query": "authentication"}'
         python -m bridge.mcp_bridge context '{"name": "validateUser"}'

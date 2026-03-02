@@ -19,7 +19,7 @@ Template structure (matches mini-swe-agent's expectations):
 import logging
 import re
 import time
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from minisweagent import Environment, Model
@@ -30,7 +30,7 @@ logger = logging.getLogger("gitnexus_agent")
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 
-class GitNexusMode(str, Enum):
+class GitNexusMode(StrEnum):
     """Evaluation modes for GitNexus integration."""
     BASELINE = "baseline"               # No GitNexus — pure mini-swe-agent
     NATIVE = "native"                   # GitNexus tools via eval-server
@@ -83,7 +83,7 @@ class GitNexusAgent(DefaultAgent):
         # Augment grep/find observations in NATIVE_AUGMENT mode
         if self.gitnexus_mode == GitNexusMode.NATIVE_AUGMENT:
             actions = message.get("extra", {}).get("actions", [])
-            for i, (action, output) in enumerate(zip(actions, outputs)):
+            for i, (action, output) in enumerate(zip(actions, outputs, strict=False)):
                 augmented = self._maybe_augment(action, output)
                 if augmented:
                     outputs[i] = augmented
