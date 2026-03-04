@@ -18,7 +18,6 @@ Usage:
 import json
 import logging
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +33,7 @@ app = typer.Typer(rich_markup_mode="rich", add_completion=False)
 def load_run_results(results_dir: Path) -> dict[str, dict]:
     """
     Load all run results from the results directory.
-    
+
     Returns: {run_id: {summary, preds, instances}}
     """
     runs = {}
@@ -148,7 +147,7 @@ def compute_metrics(run_data: dict) -> dict:
 def run_swebench_evaluation(results_dir: Path, run_id: str, subset: str = "lite") -> dict | None:
     """
     Run the official SWE-bench evaluation on predictions.
-    
+
     Requires: pip install swebench
     """
     preds_path = results_dir / run_id / "preds.json"
@@ -164,7 +163,7 @@ def run_swebench_evaluation(results_dir: Path, run_id: str, subset: str = "lite"
     try:
         eval_output = results_dir / run_id / "swebench_eval"
         cmd = [
-            sys.executable, "-m", "swebench.harness.run_evaluation",
+            "python", "-m", "swebench.harness.run_evaluation",
             "--dataset_name", dataset_mapping.get(subset, subset),
             "--predictions_path", str(preds_path),
             "--max_workers", "4",

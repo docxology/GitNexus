@@ -28,12 +28,10 @@ import time
 import traceback
 from itertools import product
 from pathlib import Path
-from typing import Any
 
 import typer
 import yaml
 from rich.console import Console
-from rich.live import Live
 from rich.table import Table
 
 # Load .env file from eval/ directory
@@ -187,7 +185,7 @@ def process_instance(
 
         # Build agent
         agent_config = dict(config.get("agent", {}))
-        agent_class_name = agent_config.pop("agent_class", "eval.agents.gitnexus_agent.GitNexusAgent")
+        agent_config.pop("agent_class", "eval.agents.gitnexus_agent.GitNexusAgent")
 
         from agents.gitnexus_agent import GitNexusAgent
         traj_path = instance_dir / f"{instance_id}.traj.json"
