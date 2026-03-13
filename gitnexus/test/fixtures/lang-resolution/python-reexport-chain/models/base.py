@@ -1,7 +1,7 @@
 class User:
     def save(self):
-        print('saving user')
+        print("saving user")
 
 class Repo:
     def persist(self):
-        print('persisting repo')
+        print("persisting repo")

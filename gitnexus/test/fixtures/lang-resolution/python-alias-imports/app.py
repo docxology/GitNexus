@@ -1,4 +1,6 @@
-from models import User as U, Repo as R
+from models import Repo as R
+from models import User as U
+
 
 def main():
     u = U("alice")

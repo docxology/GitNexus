@@ -1,3 +1,4 @@
+# ruff: noqa: TID252
 from ..models.user import User
 
 

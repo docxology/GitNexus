@@ -1,5 +1,6 @@
-from user import User
 from repo import Repo
+from user import User
+
 
 def process_entities():
     user: User = User()

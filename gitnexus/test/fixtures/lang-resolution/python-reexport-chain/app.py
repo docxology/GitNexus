@@ -1,4 +1,5 @@
-from models import User, Repo
+from models import Repo, User
+
 
 def main():
     user = User()
