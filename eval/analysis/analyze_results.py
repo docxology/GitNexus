@@ -35,7 +35,7 @@ app = typer.Typer(rich_markup_mode="rich", add_completion=False)
 def load_run_results(results_dir: Path) -> dict[str, dict]:
     """
     Load all run results from the results directory.
-    
+
     Returns: {run_id: {summary, preds, instances}}
     """
     runs = {}
@@ -149,7 +149,7 @@ def compute_metrics(run_data: dict) -> dict:
 def run_swebench_evaluation(results_dir: Path, run_id: str, subset: str = "lite") -> dict | None:
     """
     Run the official SWE-bench evaluation on predictions.
-    
+
     Requires: pip install swebench
     """
     preds_path = results_dir / run_id / "preds.json"
@@ -165,15 +165,22 @@ def run_swebench_evaluation(results_dir: Path, run_id: str, subset: str = "lite"
     try:
         eval_output = results_dir / run_id / "swebench_eval"
         cmd = [
-            sys.executable, "-m", "swebench.harness.run_evaluation",
-            "--dataset_name", dataset_mapping.get(subset, subset),
-            "--predictions_path", str(preds_path),
-            "--max_workers", "4",
-            "--run_id", run_id,
-            "--output_dir", str(eval_output),
+            sys.executable,
+            "-m",
+            "swebench.harness.run_evaluation",
+            "--dataset_name",
+            dataset_mapping.get(subset, subset),
+            "--predictions_path",
+            str(preds_path),
+            "--max_workers",
+            "4",
+            "--run_id",
+            run_id,
+            "--output_dir",
+            str(eval_output),
         ]
 
-        logger.info(f"Running SWE-bench evaluation for {run_id}...")
+        logger.info("Running SWE-bench evaluation for %s...", run_id)
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
 
         if result.returncode == 0:
@@ -182,11 +189,11 @@ def run_swebench_evaluation(results_dir: Path, run_id: str, subset: str = "lite"
             if report_path.exists():
                 return json.loads(report_path.read_text())
 
-        logger.error(f"SWE-bench eval failed: {result.stderr[:500]}")
+        logger.error("SWE-bench eval failed: %s", result.stderr[:500])
         return None
 
     except Exception as e:
-        logger.error(f"SWE-bench eval error: {e}")
+        logger.error("SWE-bench eval error: %s", e)
         return None
 
 
@@ -250,10 +257,7 @@ def compare_modes(
     runs = load_run_results(results_path)
 
     # Filter to the specified model
-    model_runs = {
-        run_id: data for run_id, data in runs.items()
-        if parse_run_id(run_id)[0] == model
-    }
+    model_runs = {run_id: data for run_id, data in runs.items() if parse_run_id(run_id)[0] == model}
 
     if not model_runs:
         console.print(f"[yellow]No results found for model: {model}[/yellow]")
@@ -323,7 +327,9 @@ def compare_modes(
             cost_color = "green" if cost_delta < 0 else "red"
             calls_color = "green" if calls_delta < 0 else "red"
 
-            console.print(f"  {mode} vs baseline: cost [{cost_color}]{cost_str}[/{cost_color}], calls [{calls_color}]{calls_str}[/{calls_color}]")
+            console.print(
+                f"  {mode} vs baseline: cost [{cost_color}]{cost_str}[/{cost_color}], calls [{calls_color}]{calls_str}[/{calls_color}]"
+            )
 
     console.print(table)
 
@@ -426,12 +432,16 @@ def _print_markdown(all_metrics: dict):
     print("|-----|-------|------|---|---------|------|------|-------|----------|")
     for run_id, m in sorted(all_metrics.items()):
         gn = str(m["total_gn_tool_calls"]) if m["total_gn_tool_calls"] > 0 else "-"
-        print(f"| {run_id} | {m['model']} | {m['mode']} | {m['n_instances']} | {m['n_with_patch']} | {m['patch_rate']:.0%} | ${m['total_cost']:.2f} | {m['total_api_calls']} | {gn} |")
+        print(
+            f"| {run_id} | {m['model']} | {m['mode']} | {m['n_instances']} | {m['n_with_patch']} | {m['patch_rate']:.0%} | ${m['total_cost']:.2f} | {m['total_api_calls']} | {gn} |"
+        )
 
 
 def _print_csv(all_metrics: dict):
     """Print CSV output."""
-    print("run_id,model,mode,n_instances,n_with_patch,patch_rate,total_cost,avg_cost,total_api_calls,avg_api_calls,total_gn_tool_calls,total_augment_hits,augment_hit_rate")
+    print(
+        "run_id,model,mode,n_instances,n_with_patch,patch_rate,total_cost,avg_cost,total_api_calls,avg_api_calls,total_gn_tool_calls,total_augment_hits,augment_hit_rate"
+    )
     for run_id, m in sorted(all_metrics.items()):
         print(
             f"{run_id},{m['model']},{m['mode']},{m['n_instances']},{m['n_with_patch']},"

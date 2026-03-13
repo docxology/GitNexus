@@ -16,6 +16,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+import contextlib
 
 logger = logging.getLogger("mcp_bridge")
 
@@ -60,11 +61,14 @@ class MCPBridge:
             )
 
             # Send initialize request
-            init_result = self._send_request("initialize", {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "gitnexus-eval", "version": "0.1.0"},
-            })
+            init_result = self._send_request(
+                "initialize",
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "gitnexus-eval", "version": "0.1.0"},
+                },
+            )
 
             if init_result is None:
                 logger.error("MCP server failed to initialize")
@@ -78,7 +82,7 @@ class MCPBridge:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to start MCP bridge: {e}")
+            logger.error("Failed to start MCP bridge: %s", e)
             self.stop()
             return False
 
@@ -90,10 +94,8 @@ class MCPBridge:
                 self.process.terminate()
                 self.process.wait(timeout=5)
             except Exception:
-                try:
+                with contextlib.suppress(Exception):
                     self.process.kill()
-                except Exception:
-                    pass
             self.process = None
         self._started = False
 
@@ -107,10 +109,13 @@ class MCPBridge:
             logger.error("MCP bridge not started")
             return None
 
-        result = self._send_request("tools/call", {
-            "name": tool_name,
-            "arguments": arguments or {},
-        })
+        result = self._send_request(
+            "tools/call",
+            {
+                "name": tool_name,
+                "arguments": arguments or {},
+            },
+        )
 
         if result is None:
             return None
@@ -146,7 +151,9 @@ class MCPBridge:
             try:
                 result = subprocess.run(
                     [cmd, "gitnexus", "--version"],
-                    capture_output=True, text=True, timeout=15,
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
                     cwd=self.repo_path,
                 )
                 if result.returncode == 0:
@@ -158,7 +165,9 @@ class MCPBridge:
         try:
             result = subprocess.run(
                 ["gitnexus", "--version"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode == 0:
                 return "gitnexus"
@@ -197,13 +206,13 @@ class MCPBridge:
             response = self._read_response(timeout=30)
             if response and response.get("id") == request_id:
                 if "error" in response:
-                    logger.error(f"MCP error: {response['error']}")
+                    logger.error("MCP error: %s", response["error"])
                     return None
                 return response.get("result")
             return None
 
         except Exception as e:
-            logger.error(f"MCP request failed: {e}")
+            logger.error("MCP request failed: %s", e)
             return None
 
     def _send_notification(self, method: str, params: dict):
@@ -224,7 +233,7 @@ class MCPBridge:
             self.process.stdin.write(message.encode("utf-8"))
             self.process.stdin.flush()
         except Exception as e:
-            logger.error(f"MCP notification failed: {e}")
+            logger.error("MCP notification failed: %s", e)
 
     def _read_response(self, timeout: float = 30) -> dict | None:
         """Read a JSON-RPC response from the MCP server."""
@@ -250,6 +259,7 @@ class MCPBridge:
                 # Parse content length
                 header_str = header_line.decode("utf-8").strip()
                 content_length = None
+
                 for line in header_str.split("\r\n"):
                     if line.lower().startswith("content-length:"):
                         content_length = int(line.split(":")[1].strip())
@@ -272,7 +282,7 @@ class MCPBridge:
             return None
 
         except Exception as e:
-            logger.error(f"Error reading MCP response: {e}")
+            logger.error("Error reading MCP response: %s", e)
             return None
 
 

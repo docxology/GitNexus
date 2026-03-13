@@ -1,0 +1,43 @@
+# Codomyrmex Agents — src/codomyrmex/git_analysis/vendor/gitnexus/gitnexus/test/fixtures/mini-repo/src
+
+**Version**: v0.1.0 | **Status**: Active | **Last Updated**: March 2026
+
+## Purpose
+Test files and validation suites.
+
+## Active Components
+- `README.md` – Project file
+- `SPEC.md` – Project file
+- `db.ts` – Project file
+- `formatter.ts` – Project file
+- `handler.ts` – Project file
+- `index.ts` – Project file
+- `validator.ts` – Project file
+
+## Operating Contracts
+- Maintain alignment between code, documentation, and configured workflows.
+- Ensure Model Context Protocol interfaces remain available for sibling agents.
+- Record outcomes in shared telemetry and update TODO queues when necessary.
+
+## Key Files
+- `AGENTS.md` - Agent coordination and navigation
+- `README.md` - Directory overview
+- `README.md`
+- `SPEC.md`
+- `db.ts`
+- `formatter.ts`
+- `handler.ts`
+- `index.ts`
+- `validator.ts`
+
+## Dependencies
+- Inherits dependencies from the parent module. See `pyproject.toml` or `package.json` for global dependencies.
+
+## Development Guidelines
+- Follow the universal agent protocols defined in the root `AGENTS.md`.
+- Adhere to the Python PEP 8 style guide and project-specific linting rules.
+- Ensure all new features are accompanied by corresponding tests (zero-mock policy).
+
+## Navigation Links
+- **📁 Parent Directory**: [mini-repo](../README.md) - Parent directory documentation
+- **🏠 Project Root**: ../../../../../../../../../../README.md - Main project documentation

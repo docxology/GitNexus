@@ -114,7 +114,7 @@ def load_instances(subset: str, split: str, slice_spec: str = "", filter_spec: s
     import re
 
     dataset_path = DATASET_MAPPING.get(subset, subset)
-    logger.info(f"Loading dataset: {dataset_path}, split: {split}")
+    logger.info("Loading dataset: %s, split: %s", dataset_path, split)
     instances = list(load_dataset(dataset_path, split=split))
 
     if filter_spec:
@@ -124,7 +124,7 @@ def load_instances(subset: str, split: str, slice_spec: str = "", filter_spec: s
         values = [int(x) if x else None for x in slice_spec.split(":")]
         instances = instances[slice(*values)]
 
-    logger.info(f"Loaded {len(instances)} instances")
+    logger.info("Loaded %s instances", len(instances))
     return instances
 
 
@@ -179,10 +179,12 @@ def process_instance(
 
         if env_class_name == "eval.environments.gitnexus_docker.GitNexusDockerEnvironment":
             from environments.gitnexus_docker import GitNexusDockerEnvironment
+
             env_config["image"] = get_swebench_docker_image(instance)
             env = GitNexusDockerEnvironment(**env_config)
         else:
             from minisweagent.environments.docker import DockerEnvironment
+
             env = DockerEnvironment(image=get_swebench_docker_image(instance), **env_config)
 
         # Build agent
@@ -190,12 +192,13 @@ def process_instance(
         agent_class_name = agent_config.pop("agent_class", "eval.agents.gitnexus_agent.GitNexusAgent")
 
         from agents.gitnexus_agent import GitNexusAgent
+
         traj_path = instance_dir / f"{instance_id}.traj.json"
         agent_config["output_path"] = traj_path
         agent = GitNexusAgent(model, env, **agent_config)
 
         # Run
-        logger.info(f"[{run_id}] Starting {instance_id}")
+        logger.info("[%s] Starting %s", run_id, instance_id)
         info = agent.run(instance["problem_statement"])
 
         result["exit_status"] = info.get("exit_status")
@@ -208,11 +211,11 @@ def process_instance(
             patch_output = env.execute({"command": "cd /testbed && git diff"})
             result["submission"] = patch_output.get("output", "").strip()
         except Exception as patch_err:
-            logger.warning(f"[{run_id}] Failed to extract patch: {patch_err}")
+            logger.warning("[%s] Failed to extract patch: %s", run_id, patch_err)
             result["submission"] = info.get("submission", "")
 
     except Exception as e:
-        logger.error(f"[{run_id}] Error on {instance_id}: {e}")
+        logger.error("[%s] Error on %s: %s", run_id, instance_id, e)
         result["exit_status"] = type(e).__name__
         result["error"] = str(e)
         result["traceback"] = traceback.format_exc()
@@ -263,7 +266,7 @@ def run_configuration(
         existing = set(json.loads((run_dir / "preds.json").read_text()).keys())
         instances = [i for i in instances if i["instance_id"] not in existing]
         if not instances:
-            logger.info(f"[{run_id}] All instances already completed, skipping")
+            logger.info("[%s] All instances already completed, skipping", run_id)
             return []
 
     console.print(f"  [bold]{run_id}[/bold]: {len(instances)} instances, {workers} workers")
@@ -277,9 +280,9 @@ def run_configuration(
     else:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {
-                executor.submit(
-                    process_instance, instance, config, output_dir, model_name, mode_name
-                ): instance["instance_id"]
+                executor.submit(process_instance, instance, config, output_dir, model_name, mode_name): instance[
+                    "instance_id"
+                ]
                 for instance in instances
             }
             for future in concurrent.futures.as_completed(futures):
@@ -287,7 +290,7 @@ def run_configuration(
                     results.append(future.result())
                 except Exception as e:
                     iid = futures[future]
-                    logger.error(f"[{run_id}] Uncaught error for {iid}: {e}")
+                    logger.error("[%s] Uncaught error for %s: %s", run_id, iid, e)
 
     # Save run summary
     summary = {
@@ -313,8 +316,12 @@ def run_configuration(
 
 @app.command()
 def single(
-    model: str = typer.Option(..., "-m", "--model", help=f"Model config name. Available: {', '.join(AVAILABLE_MODELS)}"),
-    mode: str = typer.Option("native_augment", "--mode", help=f"Evaluation mode. Available: {', '.join(AVAILABLE_MODES)}"),
+    model: str = typer.Option(
+        ..., "-m", "--model", help=f"Model config name. Available: {', '.join(AVAILABLE_MODELS)}"
+    ),
+    mode: str = typer.Option(
+        "native_augment", "--mode", help=f"Evaluation mode. Available: {', '.join(AVAILABLE_MODES)}"
+    ),
     subset: str = typer.Option("lite", "--subset", help="SWE-bench subset: lite, verified, full"),
     split: str = typer.Option("dev", "--split", help="Dataset split"),
     slice_spec: str = typer.Option("", "--slice", help="Slice spec (e.g., '0:5')"),
@@ -339,7 +346,9 @@ def single(
 
 @app.command()
 def matrix(
-    models: list[str] = typer.Option(AVAILABLE_MODELS, "-m", "--models", help="Models to evaluate (comma-separated or repeated)"),
+    models: list[str] = typer.Option(
+        AVAILABLE_MODELS, "-m", "--models", help="Models to evaluate (comma-separated or repeated)"
+    ),
     modes: list[str] = typer.Option(AVAILABLE_MODES, "--modes", help="Modes to evaluate"),
     subset: str = typer.Option("lite", "--subset", help="SWE-bench subset"),
     split: str = typer.Option("dev", "--split", help="Dataset split"),
@@ -354,7 +363,9 @@ def matrix(
     instances = load_instances(subset, split, slice_spec, filter_spec)
 
     combos = list(product(models, modes))
-    console.print(f"\n[bold]Matrix evaluation:[/bold] {len(models)} models x {len(modes)} modes = {len(combos)} configs")
+    console.print(
+        f"\n[bold]Matrix evaluation:[/bold] {len(models)} models x {len(modes)} modes = {len(combos)} configs"
+    )
     console.print(f"  Models: {', '.join(models)}")
     console.print(f"  Modes: {', '.join(modes)}")
     console.print(f"  Instances per config: {len(instances)}")
@@ -438,7 +449,9 @@ def list_configs():
         gn_mode = config.get("agent", {}).get("gitnexus_mode", "baseline")
         console.print(f"  {name:<20} gitnexus_mode={gn_mode}")
 
-    console.print(f"\n[bold]Matrix:[/bold] {len(AVAILABLE_MODELS)} models x {len(AVAILABLE_MODES)} modes = {len(AVAILABLE_MODELS) * len(AVAILABLE_MODES)} configurations")
+    console.print(
+        f"\n[bold]Matrix:[/bold] {len(AVAILABLE_MODELS)} models x {len(AVAILABLE_MODES)} modes = {len(AVAILABLE_MODELS) * len(AVAILABLE_MODES)} configurations"
+    )
 
 
 # ─── Summary Output ────────────────────────────────────────────────────────
@@ -467,12 +480,8 @@ def _print_summary(results: list[dict], model: str, mode: str):
     table.add_row("Avg Calls/Instance", f"{total_calls / max(total, 1):.1f}")
 
     # GitNexus-specific metrics
-    gn_tool_calls = sum(
-        r.get("gitnexus_metrics", {}).get("total_tool_calls", 0) for r in results
-    )
-    gn_augment_hits = sum(
-        r.get("gitnexus_metrics", {}).get("augmentation_hits", 0) for r in results
-    )
+    gn_tool_calls = sum(r.get("gitnexus_metrics", {}).get("total_tool_calls", 0) for r in results)
+    gn_augment_hits = sum(r.get("gitnexus_metrics", {}).get("augmentation_hits", 0) for r in results)
     if gn_tool_calls > 0:
         table.add_row("GitNexus Tool Calls", str(gn_tool_calls))
     if gn_augment_hits > 0:

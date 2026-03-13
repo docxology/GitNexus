@@ -27,6 +27,7 @@ import time
 from pathlib import Path
 
 from minisweagent.environments.docker import DockerEnvironment
+import contextlib
 
 logger = logging.getLogger("gitnexus_docker")
 
@@ -37,7 +38,7 @@ EVAL_SERVER_PORT = 4848
 # Each script calls the eval-server via curl, with a CLI fallback.
 # These are standalone — no sourcing, no env inheritance needed.
 
-TOOL_SCRIPT_QUERY = r'''#!/bin/bash
+TOOL_SCRIPT_QUERY = r"""#!/bin/bash
 PORT="${GITNEXUS_EVAL_PORT:-__PORT__}"
 query="$1"; task_ctx="${2:-}"; goal="${3:-}"
 [ -z "$query" ] && echo "Usage: gitnexus-query <query> [task_context] [goal]" && exit 1
@@ -48,9 +49,9 @@ args="$args}"
 result=$(curl -sf -X POST "http://127.0.0.1:${PORT}/tool/query" -H "Content-Type: application/json" -d "$args" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$result" ]; then echo "$result"; exit 0; fi
 cd /testbed && npx gitnexus query "$query" 2>&1
-'''
+"""
 
-TOOL_SCRIPT_CONTEXT = r'''#!/bin/bash
+TOOL_SCRIPT_CONTEXT = r"""#!/bin/bash
 PORT="${GITNEXUS_EVAL_PORT:-__PORT__}"
 name="$1"; file_path="${2:-}"
 [ -z "$name" ] && echo "Usage: gitnexus-context <symbol_name> [file_path]" && exit 1
@@ -60,37 +61,37 @@ args="$args}"
 result=$(curl -sf -X POST "http://127.0.0.1:${PORT}/tool/context" -H "Content-Type: application/json" -d "$args" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$result" ]; then echo "$result"; exit 0; fi
 cd /testbed && npx gitnexus context "$name" 2>&1
-'''
+"""
 
-TOOL_SCRIPT_IMPACT = r'''#!/bin/bash
+TOOL_SCRIPT_IMPACT = r"""#!/bin/bash
 PORT="${GITNEXUS_EVAL_PORT:-__PORT__}"
 target="$1"; direction="${2:-upstream}"
 [ -z "$target" ] && echo "Usage: gitnexus-impact <symbol_name> [upstream|downstream]" && exit 1
 result=$(curl -sf -X POST "http://127.0.0.1:${PORT}/tool/impact" -H "Content-Type: application/json" -d "{\"target\": \"$target\", \"direction\": \"$direction\"}" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$result" ]; then echo "$result"; exit 0; fi
 cd /testbed && npx gitnexus impact "$target" --direction "$direction" 2>&1
-'''
+"""
 
-TOOL_SCRIPT_CYPHER = r'''#!/bin/bash
+TOOL_SCRIPT_CYPHER = r"""#!/bin/bash
 PORT="${GITNEXUS_EVAL_PORT:-__PORT__}"
 query="$1"
 [ -z "$query" ] && echo "Usage: gitnexus-cypher <cypher_query>" && exit 1
 result=$(curl -sf -X POST "http://127.0.0.1:${PORT}/tool/cypher" -H "Content-Type: application/json" -d "{\"query\": \"$query\"}" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$result" ]; then echo "$result"; exit 0; fi
 cd /testbed && npx gitnexus cypher "$query" 2>&1
-'''
+"""
 
-TOOL_SCRIPT_AUGMENT = r'''#!/bin/bash
+TOOL_SCRIPT_AUGMENT = r"""#!/bin/bash
 cd /testbed && npx gitnexus augment "$1" 2>&1 || true
-'''
+"""
 
-TOOL_SCRIPT_OVERVIEW = r'''#!/bin/bash
+TOOL_SCRIPT_OVERVIEW = r"""#!/bin/bash
 PORT="${GITNEXUS_EVAL_PORT:-__PORT__}"
 echo "=== Code Knowledge Graph Overview ==="
 result=$(curl -sf -X POST "http://127.0.0.1:${PORT}/tool/list_repos" -H "Content-Type: application/json" -d "{}" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$result" ]; then echo "$result"; exit 0; fi
 cd /testbed && npx gitnexus list 2>&1
-'''
+"""
 
 
 class GitNexusDockerEnvironment(DockerEnvironment):
@@ -133,7 +134,7 @@ class GitNexusDockerEnvironment(DockerEnvironment):
             try:
                 self._setup_gitnexus()
             except Exception as e:
-                logger.warning(f"GitNexus setup failed, continuing without it: {e}")
+                logger.warning("GitNexus setup failed, continuing without it: %s", e)
                 self._gitnexus_ready = False
 
         return result
@@ -150,7 +151,7 @@ class GitNexusDockerEnvironment(DockerEnvironment):
 
         self.index_time = time.time() - start
         self._gitnexus_ready = True
-        logger.info(f"GitNexus setup completed in {self.index_time:.1f}s")
+        logger.info("GitNexus setup completed in %.1fs", self.index_time)
 
     def _ensure_nodejs(self):
         """Ensure Node.js >= 18 is available in the container."""
@@ -170,17 +171,19 @@ class GitNexusDockerEnvironment(DockerEnvironment):
                 if result.get("returncode", 1) != 0:
                     raise RuntimeError(f"Failed to install Node.js: {result.get('output', '')}")
         else:
-            logger.info(f"Node.js already available: {output}")
+            logger.info("Node.js already available: %s", output)
 
     def _install_gitnexus(self):
         """Install the gitnexus npm package globally."""
         check = self.execute({"command": "npx gitnexus --version 2>/dev/null || echo 'NOT_FOUND'"})
         if "NOT_FOUND" in check.get("output", ""):
             logger.info("Installing gitnexus...")
-            result = self.execute({
-                "command": "npm install -g gitnexus",
-                "timeout": 60,
-            })
+            result = self.execute(
+                {
+                    "command": "npm install -g gitnexus",
+                    "timeout": 60,
+                }
+            )
             if result.get("returncode", 1) != 0:
                 raise RuntimeError(f"Failed to install gitnexus: {result.get('output', '')}")
 
@@ -191,16 +194,18 @@ class GitNexusDockerEnvironment(DockerEnvironment):
         cache_path = self.cache_dir / cache_key
 
         if cache_path.exists():
-            logger.info(f"Restoring GitNexus index from cache: {cache_key}")
+            logger.info("Restoring GitNexus index from cache: %s", cache_key)
             self._restore_cache(cache_path)
             return
 
         logger.info("Running gitnexus analyze...")
         skip_flag = "--skip-embeddings" if self.skip_embeddings else ""
-        result = self.execute({
-            "command": f"cd /testbed && npx gitnexus analyze . {skip_flag} 2>&1",
-            "timeout": self.gitnexus_timeout,
-        })
+        result = self.execute(
+            {
+                "command": f"cd /testbed && npx gitnexus analyze . {skip_flag} 2>&1",
+                "timeout": self.gitnexus_timeout,
+            }
+        )
 
         if result.get("returncode", 1) != 0:
             output = result.get("output", "")
@@ -211,36 +216,42 @@ class GitNexusDockerEnvironment(DockerEnvironment):
 
     def _start_eval_server(self):
         """Start the GitNexus eval-server daemon in the background."""
-        logger.info(f"Starting eval-server on port {self.eval_server_port}...")
+        logger.info("Starting eval-server on port %s...", self.eval_server_port)
 
-        self.execute({
-            "command": (
-                f"nohup npx gitnexus eval-server --port {self.eval_server_port} "
-                f"--idle-timeout 600 "
-                f"> /tmp/gitnexus-eval-server.log 2>&1 &"
-            ),
-            "timeout": 5,
-        })
+        self.execute(
+            {
+                "command": (
+                    f"nohup npx gitnexus eval-server --port {self.eval_server_port} "
+                    f"--idle-timeout 600 "
+                    f"> /tmp/gitnexus-eval-server.log 2>&1 &"
+                ),
+                "timeout": 5,
+            }
+        )
 
         # Wait for the server to be ready (up to 15s for KuzuDB init)
         for i in range(30):
             time.sleep(0.5)
-            health = self.execute({
-                "command": f"curl -sf http://127.0.0.1:{self.eval_server_port}/health 2>/dev/null || echo 'NOT_READY'",
-                "timeout": 3,
-            })
+            health = self.execute(
+                {
+                    "command": f"curl -sf http://127.0.0.1:{self.eval_server_port}/health 2>/dev/null || echo 'NOT_READY'",
+                    "timeout": 3,
+                }
+            )
             output = health.get("output", "").strip()
             if "NOT_READY" not in output and "ok" in output:
-                logger.info(f"Eval-server ready after {(i + 1) * 0.5:.1f}s")
+                logger.info("Eval-server ready after %.1fs", (i + 1) * 0.5)
                 return
 
-        log_output = self.execute({
-            "command": "cat /tmp/gitnexus-eval-server.log 2>/dev/null | tail -20",
-        })
+        log_output = self.execute(
+            {
+                "command": "cat /tmp/gitnexus-eval-server.log 2>/dev/null | tail -20",
+            }
+        )
+        server_log = log_output.get("output", "N/A")
         logger.warning(
-            f"Eval-server didn't become ready in 15s. "
-            f"Tools will fall back to direct CLI.\n"
-            f"Server log: {log_output.get('output', 'N/A')}"
+            "Eval-server didn't become ready in 15s. Tools will fall back to direct CLI.\nServer log: %s",
+            server_log,
         )
 
     def _install_tools(self):
@@ -271,18 +282,20 @@ class GitNexusDockerEnvironment(DockerEnvironment):
         for name, script in tools.items():
             script_content = script.replace("__PORT__", port).strip()
             # Use heredoc with quoted delimiter — prevents all variable expansion and quoting issues
-            self.execute({
-                "command": f"cat << 'GITNEXUS_SCRIPT_EOF' > /usr/local/bin/{name}\n{script_content}\nGITNEXUS_SCRIPT_EOF\nchmod +x /usr/local/bin/{name}",
-                "timeout": 5,
-            })
+            self.execute(
+                {
+                    "command": f"cat << 'GITNEXUS_SCRIPT_EOF' > /usr/local/bin/{name}\n{script_content}\nGITNEXUS_SCRIPT_EOF\nchmod +x /usr/local/bin/{name}",
+                    "timeout": 5,
+                }
+            )
 
-        logger.info(f"Installed {len(tools)} GitNexus tool scripts in /usr/local/bin/")
+        logger.info("Installed %s GitNexus tool scripts in /usr/local/bin/", len(tools))
 
     def _get_repo_info(self) -> dict:
         """Get repository identity info from the container."""
-        repo_result = self.execute({
-            "command": "cd /testbed && basename $(git remote get-url origin 2>/dev/null || basename $(pwd)) .git"
-        })
+        repo_result = self.execute(
+            {"command": "cd /testbed && basename $(git remote get-url origin 2>/dev/null || basename $(pwd)) .git"}
+        )
         commit_result = self.execute({"command": "cd /testbed && git rev-parse HEAD 2>/dev/null || echo unknown"})
 
         return {
@@ -301,31 +314,37 @@ class GitNexusDockerEnvironment(DockerEnvironment):
         try:
             cache_path.mkdir(parents=True, exist_ok=True)
 
-            find_result = self.execute({
-                "command": "find /root/.gitnexus -name 'kuzu' -type d 2>/dev/null | head -1"
-            })
+            find_result = self.execute({"command": "find /root/.gitnexus -name 'kuzu' -type d 2>/dev/null | head -1"})
             gitnexus_dir = find_result.get("output", "").strip()
 
             if gitnexus_dir:
                 parent = str(Path(gitnexus_dir).parent)
-                self.execute({
-                    "command": f"cd {parent} && tar czf /tmp/gitnexus-cache.tar.gz .",
-                    "timeout": 30,
-                })
+                self.execute(
+                    {
+                        "command": f"cd {parent} && tar czf /tmp/gitnexus-cache.tar.gz .",
+                        "timeout": 30,
+                    }
+                )
 
                 container_id = getattr(self, "_container_id", None) or getattr(self, "container_id", None)
                 if container_id:
                     import subprocess as sp
+
                     sp.run(
-                        ["docker", "cp", f"{container_id}:/tmp/gitnexus-cache.tar.gz",
-                         str(cache_path / "index.tar.gz")],
-                        check=True, capture_output=True,
+                        [
+                            "docker",
+                            "cp",
+                            f"{container_id}:/tmp/gitnexus-cache.tar.gz",
+                            str(cache_path / "index.tar.gz"),
+                        ],
+                        check=True,
+                        capture_output=True,
                     )
                     (cache_path / "metadata.json").write_text(json.dumps(repo_info, indent=2))
-                    logger.info(f"Cached GitNexus index: {cache_path}")
+                    logger.info("Cached GitNexus index: %s", cache_path)
 
         except Exception as e:
-            logger.warning(f"Failed to cache GitNexus index: {e}")
+            logger.warning("Failed to cache GitNexus index: %s", e)
             if cache_path.exists():
                 shutil.rmtree(cache_path, ignore_errors=True)
 
@@ -344,36 +363,41 @@ class GitNexusDockerEnvironment(DockerEnvironment):
 
                 self.execute({"command": "mkdir -p /root/.gitnexus"})
 
-                storage_result = self.execute({
-                    "command": "npx gitnexus list 2>/dev/null | grep -o '/root/.gitnexus/[^ ]*' | head -1 || echo '/root/.gitnexus/repos/default'"
-                })
+                storage_result = self.execute(
+                    {
+                        "command": "npx gitnexus list 2>/dev/null | grep -o '/root/.gitnexus/[^ ]*' | head -1 || echo '/root/.gitnexus/repos/default'"
+                    }
+                )
                 storage_path = storage_result.get("output", "").strip() or "/root/.gitnexus/repos/default"
                 self.execute({"command": f"mkdir -p {storage_path}"})
 
                 sp.run(
                     ["docker", "cp", str(cache_tarball), f"{container_id}:/tmp/gitnexus-cache.tar.gz"],
-                    check=True, capture_output=True,
+                    check=True,
+                    capture_output=True,
                 )
-                self.execute({
-                    "command": f"cd {storage_path} && tar xzf /tmp/gitnexus-cache.tar.gz",
-                    "timeout": 30,
-                })
+                self.execute(
+                    {
+                        "command": f"cd {storage_path} && tar xzf /tmp/gitnexus-cache.tar.gz",
+                        "timeout": 30,
+                    }
+                )
                 logger.info("GitNexus index restored from cache")
 
         except Exception as e:
-            logger.warning(f"Failed to restore cache, re-indexing: {e}")
+            logger.warning("Failed to restore cache, re-indexing: %s", e)
             self._index_repository()
 
     def stop(self) -> dict:
         """Stop the container, shutting down eval-server first."""
         if self._gitnexus_ready:
-            try:
-                self.execute({
-                    "command": f"curl -sf -X POST http://127.0.0.1:{self.eval_server_port}/shutdown 2>/dev/null || true",
-                    "timeout": 3,
-                })
-            except Exception:
-                pass
+            with contextlib.suppress(Exception):
+                self.execute(
+                    {
+                        "command": f"curl -sf -X POST http://127.0.0.1:{self.eval_server_port}/shutdown 2>/dev/null || true",
+                        "timeout": 3,
+                    }
+                )
 
         return super().stop()
 
